@@ -28,7 +28,7 @@ const getConfig = () => {
   // Using the same protocol as we've been loaded from to avoid Mixed Content error.
   let apiBaseUrl = 'TTK_API_BASE_URL'
   if (!apiBaseUrl.startsWith('http')) {
-    apiBaseUrl = `${protocol}//${hostname}:5050`
+    apiBaseUrl = `${protocol}//${hostname}:7075`
   }
 
   return { apiBaseUrl }

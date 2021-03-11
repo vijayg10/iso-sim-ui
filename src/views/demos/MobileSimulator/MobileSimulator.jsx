@@ -114,6 +114,14 @@ class MobileSimulator extends React.Component {
 
   updateSequenceDiagram = (event) => {
     switch(event.type) {
+      // ISO20022 Message
+      case 'isoMessage':
+      {
+        if (this.testDiagramRef.current) {
+          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP REQ] ' + event.data.description)
+        }
+        break
+      }
       // Payer Side Events
       case 'getParties':
       {
