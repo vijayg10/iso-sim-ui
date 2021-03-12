@@ -34,6 +34,7 @@ import TestDiagram from "./TestDiagram.jsx";
 import TestMonitor from "./TestMonitor.jsx";
 import Settings from "./Settings.jsx";
 import HUBConsole from "./HUBConsole.jsx";
+import ActivityLog from "./ActivityLog.jsx";
 import NotificationService from '../../../services/demos/MobileSimulator/mojaloopNotifications'
 import OutboundService from '../../../services/demos/MobileSimulator/mojaloopOutbound'
 import { getServerConfig } from '../../../utils/getConfig'
@@ -62,6 +63,7 @@ class MobileSimulator extends React.Component {
     this.payeeMonitorRef = React.createRef();
     this.settingsRef = React.createRef();
     this.hubConsoleRef = React.createRef();
+    this.activityLogRef = React.createRef();
     this.notificationServiceObj = new NotificationService()
     // const sessionId = this.notificationServiceObj.getSessionId()
     // this.outboundServiceObj = new OutboundService(sessionId)
@@ -86,9 +88,11 @@ class MobileSimulator extends React.Component {
     if (event.category === 'payer') {
       this.payerMobileRef.current && this.payerMobileRef.current.handleNotificationEvents(event)
       this.updateSequenceDiagram(event)
+      this.updateActivityLog(event)
     } else if (event.category === 'payee') {
       this.payeeMobileRef.current && this.payeeMobileRef.current.handleNotificationEvents(event)
       this.updateSequenceDiagram(event)
+      this.updateActivityLog(event)
     } else if (event.category === 'payerMonitorLog') {
       this.payerMonitorRef.current && this.payerMonitorRef.current.appendLog(event.data.log)
     } else if (event.category === 'payeeMonitorLog') {
@@ -112,189 +116,116 @@ class MobileSimulator extends React.Component {
     }
   }
 
+
+  updateActivityLog = (event) => {
+    if (event.type === 'isoMessage') {
+      // ISO20022 Message
+      if (this.activityLogRef.current) {
+        this.activityLogRef.current.addLog(event.data.fromComponent, event.data.toComponent, event.data.description, event.data.xmlData)
+      }
+    }
+    else if (event.type.startsWith('payee')) {
+      if (this.activityLogRef.current) {
+        this.activityLogRef.current.addLog(event.data.fromComponent, event.data.toComponent, event.data.description, event.data.requestBody ? JSON.stringify(event.data.requestBody, null, 2) : null)
+      }
+    }
+  }
+
   updateSequenceDiagram = (event) => {
     switch(event.type) {
       // ISO20022 Message
       case 'isoMessage':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP REQ] ' + event.data.description)
-        }
-        break
-      }
-      // Payer Side Events
-      case 'getParties':
-      {
-        this.clearEverything()
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP REQ] GET ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'both'}})
-        }
-        break
-      }
-      case 'getPartiesResponse':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
-        }
-        break
-      }
-      case 'putParties':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP Callback] PUT ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
-        }
-        break
-      }
-      case 'putPartiesResponse':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'both'}})
-        }
-        break
-      }
-      case 'postQuotes':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addNoteOver(this.state.payerName, this.state.payeeName, 'Quotes')
-          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP REQ] POST ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'both'}})
-        }
-        break
-      }
-      case 'postQuotesResponse':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
-        }
-        break
-      }
-      case 'putQuotes':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP Callback] PUT ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
-        }
-        break
-      }
-      case 'putQuotesResponse':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'both'}})
-        }
-        break
-      }
-      case 'postTransfers':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addNoteOver(this.state.payerName, this.state.payeeName, 'Transfer')
-          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP REQ] POST ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'both'}})
-        }
-        break
-      }
-      case 'postTransfersResponse':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
-        }
-        break
-      }
-      case 'putTransfers':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payerName, '[HTTP Callback] PUT ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
-        }
-        break
-      }
-      case 'putTransfersResponse':
-      {
-        if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payerName, this.state.hubName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'both'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP REQ] ' + event.data.description)
         }
         break
       }
 
-      // Payer Side Events
+      // Payee Side Events
       case 'payeeGetParties':
       {
         if (this.testDiagramRef.current) {
           this.testDiagramRef.current.addCustomSequence(`rect rgb(255, 245, 173)\n${this.state.hubName}-->>${this.state.hubName}: Oracle Lookup\nend\n`)
           // this.testDiagramRef.current.addSequence(this.state.hubName, this.state.hubName, 'Oracle Lookup')
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payeeName, '[HTTP REQ] GET ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP REQ] GET ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
         }
         break
       }
       case 'payeeGetPartiesResponse':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payeeName, this.state.hubName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true})
         }
         break
       }
       case 'payeePutParties':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payeeName, this.state.hubName, '[HTTP Callback] PUT ' + event.data.resource.path)
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP Callback] PUT ' + event.data.resource.path)
         }
         break
       }
       case 'payeePutPartiesResponse':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payeeName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
         }
         break
       }
       case 'payeePostQuotes':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payeeName, '[HTTP REQ] POST ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP REQ] POST ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
         }
         break
       }
       case 'payeePostQuotesResponse':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payeeName, this.state.hubName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true})
         }
         break
       }
       case 'payeePutQuotes':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payeeName, this.state.hubName, '[HTTP Callback] PUT ' + event.data.resource.path)
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP Callback] PUT ' + event.data.resource.path)
         }
         break
       }
       case 'payeePutQuotesResponse':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payeeName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
         }
         break
       }
       case 'payeePostTransfers':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payeeName, '[HTTP REQ] POST ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP REQ] POST ' + event.data.resource.path, {activation: { mode: 'activate', peer: 'destination'}})
         }
         break
       }
       case 'payeePostTransfersResponse':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payeeName, this.state.hubName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true})
         }
         break
       }
       case 'payeePutTransfers':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.payeeName, this.state.hubName, '[HTTP Callback] PUT ' + event.data.resource.path)
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP Callback] PUT ' + event.data.resource.path)
         }
         break
       }
       case 'payeePutTransfersResponse':
       {
         if (this.testDiagramRef.current) {
-          this.testDiagramRef.current.addSequence(this.state.hubName, this.state.payeeName, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
+          this.testDiagramRef.current.addSequence(event.data.fromComponent, event.data.toComponent, '[HTTP RESP] ' + event.data.responseStatus, {dashed: true, activation: { mode: 'deactivate', peer: 'destination'}})
         }
         break
       }
@@ -330,7 +261,7 @@ class MobileSimulator extends React.Component {
       >
         <TestMonitor ref={this.payeeMonitorRef} />
       </Drawer>
-      <Modal
+      {/* <Modal
           style={{ top: 20 }}
           destroyOnClose
           title="Settings"
@@ -342,7 +273,7 @@ class MobileSimulator extends React.Component {
             ref={this.settingsRef}
             outboundService={this.outboundServiceObj}
           />
-      </Modal>
+      </Modal> */}
       <Row className="h-100">
         <Col span={24}>
           <Row className='h-100'>
@@ -380,7 +311,7 @@ class MobileSimulator extends React.Component {
               </Row>
             </Col>
             <Col span={16} className='text-center'>
-              <Button
+              {/* <Button
                 className='mt-2 mb-2'
                 style={ {width: '50px', height: '50px'} }
                 danger
@@ -389,7 +320,7 @@ class MobileSimulator extends React.Component {
                 onClick={() => { this.setState({showSettings: true})}}
               >
                 <SettingOutlined style={ {fontSize: '24px'} } />
-              </Button>
+              </Button> */}
               <div
                 style={{
                   height: '90vh'
@@ -407,9 +338,19 @@ class MobileSimulator extends React.Component {
                   </div>
                 </TabPane>
                 {
+                  <TabPane tab="Activity Log" key="2" forceRender>
+                    <ActivityLog
+                      style={{
+                        width: '90%'
+                      }}
+                      ref={this.activityLogRef}
+                    />
+                  </TabPane>
+                }
+                {/* {
                   this.state.hubConsoleEnabled
                   ? (
-                    <TabPane tab="Hub Console" key="2">
+                    <TabPane tab="Hub Console" key="3">
                       <HUBConsole
                         style={{
                           width: '90%'
@@ -420,7 +361,7 @@ class MobileSimulator extends React.Component {
                     </TabPane>
                   )
                   : null
-                }
+                } */}
               </Tabs>
               </div>
             </Col>
